@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">SmartAmpuleReader_app</string>
+    <string name="capture_ampoule">Capture Ampoule</string>
+    <string name="test_saved_image">Test Saved Image</string>
+    <string name="ocr_failed">OCR failed</string>
+    <string name="ocr_failed_with_error">OCR failed: %1$s</string>
+    <string name="test_ocr_failed">Test OCR failed</string>
+    <string name="test_ocr_failed_with_error">Test OCR failed: %1$s</string>
+    <string name="capture_failed">Capture failed: %1$s</string>
+    <string name="camera_binding_failed">Camera binding failed: %1$s</string>
+    <string name="generic_error_format">%1$s: %2$s</string>
+    <string name="extract_info">Extract Ampoule Info</string>
+    <string name="no_images_error">Please capture at least one image before extracting.</string>
+    <string name="max_images_reached">Maximum 8 images reached.</string>
+    <string name="processing">Processing images...</string>
+    <string name="remove">X</string>
+    <string name="upload_gallery">Gallery</string>
+    <string name="test_image">Test Asset</string>
+</resources>
