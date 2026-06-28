@@ -8,10 +8,9 @@ The application captures multiple images of an ampoule, performs OCR across all 
 
 ## Features
 
-- 📷 Capture **1–8 images** of the same ampoule
-- 🗑️ Add and remove images before processing
+- 📷 Capture **multiple angles** of the same ampoule
 - 🔍 Offline OCR pipeline
-- 🤖 Local LLM extraction (Qwen 2.5 1.5B)
+- 🤖 Local LLM extraction
 - 📄 Structured JSON output
 - 🔒 Privacy-first (no cloud processing)
 - 📱 Designed for Android devices
