@@ -81,28 +81,30 @@ class AmpouleExtractor(private val context: Context) : AutoCloseable {
         
         OCR Text:
         $text
-        
-        JSON Schema:
-        {
-          "product_name": "Full name of the medicine (e.g. Propofol)",
-          "strength": "Concentration (e.g. 10mg/ml or 1%)",
-          "volume": "Total liquid amount (e.g. 5ml or 2ml)",
-          "batch_lot_number": "Batch or Lot ID",
-          "expiry_date": "Expiration date exactly as shown on the label",
-          "manufacturer": "Company name (e.g. Fresenius, Pfizer, etc.)",
-          "confidence_product_name": 0.95,
-          "confidence_strength": 0.95,
-          "confidence_volume": 0.95,
-          "confidence_batch_lot_number": 0.95,
-          "confidence_expiry_date": 0.95,
-          "confidence_manufacturer": 0.95
-        }
+        Required JSON Format:
+            {
+              "product_name": String or null,
+              "strength": String or null,
+              "volume": String or null,
+              "batch_lot_number": String or null,
+              "expiry_date": String or null,
+              "manufacturer": String or null,
+              "confidence_product_name": Number or null,
+              "confidence_strength": Number or null,
+              "confidence_volume": Number or null,
+              "confidence_batch_lot_number": Number or null,
+              "confidence_expiry_date": Number or null,
+              "confidence_manufacturer": Number or null,
+            }
+            
+           
         
         CRITICAL RULES:
         1. Confidence values MUST be a Number between 0.0 and 1.0 (e.g. 0.9). NEVER put text, dates, or symbols in confidence fields.
         2. "product_name" is the medicine itself. "manufacturer" is the company. Do not swap them.
         3. Use null for fields you cannot find.
-        4. Respond ONLY with the valid JSON object. No preamble.
+        4. Respond ONLY with the valid JSON object. No preamble.   
+        5. Do NOT nest objects.      
         
         JSON Output:
     """.trimIndent()
