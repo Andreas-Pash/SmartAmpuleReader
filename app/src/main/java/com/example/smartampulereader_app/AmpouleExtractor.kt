@@ -76,37 +76,36 @@ class AmpouleExtractor(private val context: Context) : AutoCloseable {
         val text = lines.joinToString("\n") { "[Source: ${it.sourceImage}] ${it.text}" }
 
         return """
-            You are combining multiple OCR-extracted JSON objects from different images/views of the same medicine ampoule.
-            Task: Output a flat JSON object of the ampoule label information based on the OCR Text.
-            
-            OCR Text:
-            $text
-            
-            Required JSON Format:
-            {
-              "product_name": String or null,
-              "strength": String or null,
-              "volume": String or null,
-              "batch_lot_number": String or null,
-              "expiry_date": String or null,
-              "manufacturer": String or null,
-              "confidence_product_name": Number or null,
-              "confidence_strength": Number or null,
-              "confidence_volume": Number or null,
-              "confidence_batch_lot_number": Number or null,
-              "confidence_expiry_date": Number or null,
-              "confidence_manufacturer": Number or null,
-            }
-            
-            Rules:
-            - Respond ONLY with the valid JSON object.
-            - Do NOT use dots in keys. Use underscores only.
-            - Do NOT nest objects.
-            - Batch is usually near "Batch" or "LOT".
-            - Expiry is near "EXP".
-            
-            JSON Output:
-        """.trimIndent()
+        You are a medical data extraction expert. Analyze the following OCR text from a medicine ampoule.
+        Task: Extract label information into a flat JSON object.
+        
+        OCR Text:
+        $text
+        
+        JSON Schema:
+        {
+          "product_name": "Full name of the medicine (e.g. Propofol)",
+          "strength": "Concentration (e.g. 10mg/ml or 1%)",
+          "volume": "Total liquid amount (e.g. 5ml or 2ml)",
+          "batch_lot_number": "Batch or Lot ID",
+          "expiry_date": "Expiration date exactly as shown on the label",
+          "manufacturer": "Company name (e.g. Fresenius, Pfizer, etc.)",
+          "confidence_product_name": 0.95,
+          "confidence_strength": 0.95,
+          "confidence_volume": 0.95,
+          "confidence_batch_lot_number": 0.95,
+          "confidence_expiry_date": 0.95,
+          "confidence_manufacturer": 0.95
+        }
+        
+        CRITICAL RULES:
+        1. Confidence values MUST be a Number between 0.0 and 1.0 (e.g. 0.9). NEVER put text, dates, or symbols in confidence fields.
+        2. "product_name" is the medicine itself. "manufacturer" is the company. Do not swap them.
+        3. Use null for fields you cannot find.
+        4. Respond ONLY with the valid JSON object. No preamble.
+        
+        JSON Output:
+    """.trimIndent()
     }
 
     override fun close() {
