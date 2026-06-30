@@ -1,11 +1,14 @@
 package com.example.smartampulereader_app
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -37,6 +40,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -49,9 +54,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var galleryButton: Button
     private lateinit var testButton: Button
 
-    private val capturedImages = mutableListOf<File>()
-    private val extractor = AmpouleExtractor()
-    
+    private val capturedImageUris = mutableListOf<Uri>()
+    private lateinit var extractor: AmpouleExtractor
+
     // Reverting back to Google ML Kit recognizer
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
@@ -65,14 +70,14 @@ class MainActivity : AppCompatActivity() {
 
     private val pickMedia = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            copyUriToFile(uri)?.let { file ->
-                addImageToList(file)
-            }
+            addImageToList(uri)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        extractor = AmpouleExtractor(this)
 
         previewView = PreviewView(this)
         resultText = TextView(this)
@@ -134,7 +139,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         galleryButton.setOnClickListener {
-            if (capturedImages.size < 8) {
+            if (capturedImageUris.size < 8) {
                 pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             } else {
                 Toast.makeText(this, R.string.max_images_reached, Toast.LENGTH_SHORT).show()
@@ -142,9 +147,34 @@ class MainActivity : AppCompatActivity() {
         }
 
         testButton.setOnClickListener {
-            copyAssetToFile("test_ampoule.jpg")?.let { file ->
-                addImageToList(file)
+            val assetFiles = assets.list("")?.filter { it.endsWith(".jpg") } ?: emptyList()
+            if (assetFiles.isEmpty()) {
+                Toast.makeText(this, "No test images found in assets", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            val checkedItems = BooleanArray(assetFiles.size)
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Select Test Images")
+                .setMultiChoiceItems(assetFiles.toTypedArray(), checkedItems) { _, which, isChecked ->
+                    checkedItems[which] = isChecked
+                }
+                .setPositiveButton("Add Selected") { _, _ ->
+                    for (i in checkedItems.indices) {
+                        if (checkedItems[i]) {
+                            val selectedAsset = assetFiles[i]
+                            if (capturedImageUris.size < 8) {
+                                // Create a unique target name to allow adding the same asset multiple times
+                                val targetName = "${System.currentTimeMillis()}_$selectedAsset"
+                                copyAssetToFile(selectedAsset, targetName)?.let { file ->
+                                    addImageToList(Uri.fromFile(file))
+                                }
+                            }
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
 
         extractButton.setOnClickListener {
@@ -178,17 +208,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun captureImage() {
-        if (capturedImages.size >= 8) return
+        if (capturedImageUris.size >= 8) return
 
-        val file = File(cacheDir, "camera_${System.currentTimeMillis()}.jpg")
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
+        val name = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(System.currentTimeMillis())
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SmartAmpuleReader")
+            }
+        }
+
+        val outputOptions = ImageCapture.OutputFileOptions
+            .Builder(contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+            .build()
 
         imageCapture.takePicture(
             outputOptions,
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    addImageToList(file)
+                    outputFileResults.savedUri?.let { uri ->
+                        addImageToList(uri)
+                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -198,32 +240,18 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun addImageToList(file: File) {
-        if (capturedImages.size < 8) {
-            capturedImages.add(file)
+    private fun addImageToList(uri: Uri) {
+        if (capturedImageUris.size < 8) {
+            capturedImageUris.add(uri)
             updateThumbnails()
         } else {
             Toast.makeText(this, R.string.max_images_reached, Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun copyUriToFile(uri: Uri): File? {
+    private fun copyAssetToFile(assetName: String, targetName: String = "test_${System.currentTimeMillis()}.jpg"): File? {
         return try {
-            val file = File(cacheDir, "gallery_${System.currentTimeMillis()}.jpg")
-            contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(file).use { output ->
-                    input.copyTo(output)
-                }
-            }
-            file
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun copyAssetToFile(assetName: String): File? {
-        return try {
-            val file = File(cacheDir, "test_${System.currentTimeMillis()}.jpg")
+            val file = File(cacheDir, targetName)
             assets.open(assetName).use { input ->
                 FileOutputStream(file).use { output ->
                     input.copyTo(output)
@@ -235,9 +263,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun getFileNameFromUri(uri: Uri): String {
+        if (uri.scheme == "file") {
+            // For test assets, the filename is part of the path, but we might want the original asset name
+            // However, Uri.fromFile(file) loses the "test_ampoule.jpg" name if we use a cache file
+            return uri.lastPathSegment ?: "unknown_file"
+        }
+
+        var name = "unknown_media"
+        contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                name = cursor.getString(index)
+            }
+        }
+        return name
+    }
+
     private fun updateThumbnails() {
         thumbnailContainer.removeAllViews()
-        capturedImages.forEach { file ->
+        capturedImageUris.forEach { uri ->
             val frame = FrameLayout(this).apply {
                 layoutParams = LinearLayout.LayoutParams(250, 250).apply {
                     setMargins(8, 8, 8, 8)
@@ -247,8 +292,14 @@ class MainActivity : AppCompatActivity() {
             val imageView = ImageView(this).apply {
                 layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                setImageBitmap(bitmap)
+                try {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    setImageBitmap(bitmap)
+                    inputStream?.close()
+                } catch (e: Exception) {
+                    // Handle error
+                }
             }
 
             val removeButton = Button(this).apply {
@@ -257,8 +308,8 @@ class MainActivity : AppCompatActivity() {
                     gravity = Gravity.TOP or Gravity.END
                 }
                 setOnClickListener {
-                    capturedImages.remove(file)
-                    file.delete()
+                    capturedImageUris.remove(uri)
+                    // Optionally delete from MediaStore, but usually we just remove from the list
                     updateThumbnails()
                 }
             }
@@ -268,39 +319,42 @@ class MainActivity : AppCompatActivity() {
             thumbnailContainer.addView(frame)
         }
 
-        val isLimitReached = capturedImages.size >= 8
+        val isLimitReached = capturedImageUris.size >= 8
         captureButton.isEnabled = !isLimitReached
         galleryButton.isEnabled = !isLimitReached
         testButton.isEnabled = !isLimitReached
     }
 
     private fun runExtractionAcrossAllImages() {
-        if (capturedImages.isEmpty()) {
+        if (capturedImageUris.isEmpty()) {
             resultText.text = getString(R.string.no_images_error)
             return
         }
 
         resultText.text = getString(R.string.processing)
-        
+
         lifecycleScope.launch {
             try {
                 val allLines = mutableListOf<OcrLine>()
-                
-                capturedImages.forEach { file ->
-                    val image = InputImage.fromFilePath(this@MainActivity, Uri.fromFile(file))
+
+                capturedImageUris.forEach { uri ->
+                    val fileName = getFileNameFromUri(uri)
+                    val image = InputImage.fromFilePath(this@MainActivity, uri)
                     val visionText = withContext(Dispatchers.IO) {
                         Tasks.await(recognizer.process(image))
                     }
                     val lines = visionText.textBlocks.flatMap { block ->
                         block.lines.map { line ->
-                            OcrLine(text = line.text, score = 1.0)
+                            OcrLine(text = line.text, sourceImage = fileName)
                         }
                     }
                     allLines.addAll(lines)
                 }
 
-                val result = extractor.extract(allLines)
-                val gson = GsonBuilder().setPrettyPrinting().create()
+                val result = withContext(Dispatchers.IO) {
+                                extractor.extract(allLines)
+                            }
+                val gson = GsonBuilder().serializeNulls().setPrettyPrinting().create()
                 val linesJson = gson.toJson(allLines)
                 val resultJson = gson.toJson(result)
 
@@ -313,7 +367,7 @@ class MainActivity : AppCompatActivity() {
 
                 resultText.text = output
             } catch (e: Exception) {
-                resultText.text = getString(R.string.ocr_failed_with_error, e.message)
+                resultText.text = "Extraction failed: ${e.message}"
             }
         }
     }

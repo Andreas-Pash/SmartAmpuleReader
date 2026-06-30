@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace = "com.example.smartampulereader_app"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.smartampulereader_app"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -53,6 +49,8 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:latest.release")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.mediapipe:tasks-genai:0.10.35")
 
     testImplementation("junit:junit:4.13.2")
 //    testImplementation(libs.junit)

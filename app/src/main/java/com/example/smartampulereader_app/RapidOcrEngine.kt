@@ -49,7 +49,7 @@ class RapidOcrEngine(private val context: Context) : AutoCloseable {
 
     fun run(bitmap: Bitmap): List<OcrLine> {
         if (recSession == null) {
-            return listOf(OcrLine("ERROR: rec_model.onnx or rec_dict.txt not found in assets", 0.0))
+            return listOf(OcrLine("ERROR: rec_model.onnx or rec_dict.txt not found in assets", "system_error"))
         }
         
         val results = mutableListOf<OcrLine>()
@@ -72,11 +72,11 @@ class RapidOcrEngine(private val context: Context) : AutoCloseable {
         val resized = Bitmap.createScaledBitmap(bitmap, 320, 32, true)
         val tensor = bitmapToFloatBuffer(resized, 32, 320)
         
-        val inputName = recSession?.inputNames?.firstOrNull() ?: return OcrLine("", 0.0)
+        val inputName = recSession?.inputNames?.firstOrNull() ?: return OcrLine("", "unknown")
         val inputTensor = OnnxTensor.createTensor(env, tensor, longArrayOf(1, 3, 32, 320))
 
         recSession?.run(mapOf(inputName to inputTensor)).use { result ->
-            val output = result?.get(0)?.value as? Array<Array<FloatArray>> ?: return OcrLine("", 0.0)
+            val output = result?.get(0)?.value as? Array<Array<FloatArray>> ?: return OcrLine("", "unknown")
             return decodeCTC(output[0])
         }
     }
@@ -102,8 +102,8 @@ class RapidOcrEngine(private val context: Context) : AutoCloseable {
             lastIdx = maxIdx
         }
 
-        val avgScore = if (count > 0) totalScore / count else 0f
-        return OcrLine(sb.toString(), avgScore.toDouble())
+        // We'll use "rapid_ocr" as placeholder source since we don't have the filename here easily
+        return OcrLine(sb.toString(), "rapid_ocr")
     }
 
     private fun bitmapToFloatBuffer(bitmap: Bitmap, height: Int, width: Int): FloatBuffer {
